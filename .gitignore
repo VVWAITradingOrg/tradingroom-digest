@@ -1,0 +1,12 @@
+.DS_Store
+.env
+logs/
+exports/
+people.json
+*.dll
+*.dylib
+*.pdb
+createdump
+DiscordChatExporter.Cli
+DiscordChatExporter.Cli.deps.json
+DiscordChatExporter.Cli.runtimeconfig.json
