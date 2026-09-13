@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.vvw.tradingroom-watchdog</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/vvw/Automation/tradingroom-digest/watchdog.py</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>2700</integer>
+    <key>StandardOutPath</key>
+    <string>/Users/vvw/Automation/tradingroom-digest/logs/watchdog.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/vvw/Automation/tradingroom-digest/logs/watchdog.err.log</string>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

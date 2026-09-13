@@ -169,10 +169,19 @@ if [ "$DELIVER" = "1" ]; then
     || echo "[pipeline] Discord 投递失败，见下方 vvwbot 步骤是否仍继续" >&2
 
   bash report.sh "$JOB" step "5/5 交付 vvwbot" "$SESSION_LABEL"
-  ( cd ~/Desktop/vvwbot-site && venv/bin/python build.py >/dev/null && wrangler deploy >/dev/null 2>&1 )
+  VVWBOT_DIR="/Users/vvw/Automation/vvwbot-site"
+  VVWBOT_OUT="$(cd "$VVWBOT_DIR" && venv/bin/python build.py 2>&1 && wrangler deploy 2>&1)"
+  VVWBOT_STATUS=$?
+  if [ "$VVWBOT_STATUS" -ne 0 ]; then
+    bash report.sh "$JOB" fail "vvwbot 构建/部署命令本身失败 (exit=$VVWBOT_STATUS)，不看 Access 校验直接判失败。输出: $(echo "$VVWBOT_OUT" | tail -c 400)" "$SESSION_LABEL"
+    trap - EXIT
+    exit 1
+  fi
+  # Access 校验只是双保险（防 Access 保护本身失效导致误报安全），不能替代上面的退出码检查——
+  # curl 对一个"受保护但根本没部署成功"的路径同样会拿到 302，靠它单独判断会漏掉真实的部署失败。
   ACCESS_CHECK="$(curl -sS -o /dev/null -w '%{http_code}' https://vvwbot.com/research/tradingroom/ 2>/dev/null || echo "000")"
   if [ "$ACCESS_CHECK" != "302" ]; then
-    bash report.sh "$JOB" fail "vvwbot 发布后 Access 校验失败：/research/tradingroom/ 返回 ${ACCESS_CHECK}（应为302），可能是 Access 保护失效或部署出错，不能当成功处理" "$SESSION_LABEL"
+    bash report.sh "$JOB" fail "vvwbot 命令退出码是0，但 Access 校验失败：/research/tradingroom/ 返回 ${ACCESS_CHECK}（应为302），可能是 Access 保护本身失效，不能当成功处理" "$SESSION_LABEL"
     trap - EXIT
     exit 1
   fi
