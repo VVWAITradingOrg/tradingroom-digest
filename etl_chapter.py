@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from chat_clean import build_id_to_name, clean_content
 
 TZ = ZoneInfo("America/Los_Angeles")
-FOCUS_USERS = ["himself65", "solo_leveling116", "frank_hou._87743"]
+FOCUS_USERS = ["himself65", "solo_leveling116", "frank_hou._87743", "sunrunlong1727"]
 
 
 def main():

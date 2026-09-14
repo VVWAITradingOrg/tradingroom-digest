@@ -24,7 +24,7 @@ id_to_name = build_id_to_name(msgs)
 def clean_content(m):
     return _clean_content(m, id_to_name)
 
-FOCUS_USERS = ["himself65", "solo_leveling116", "frank_hou._87743"]
+FOCUS_USERS = ["himself65", "solo_leveling116", "frank_hou._87743", "sunrunlong1727"]
 
 by_day = defaultdict(list)
 focus_by_day = {u: defaultdict(list) for u in FOCUS_USERS}
