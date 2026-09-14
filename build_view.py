@@ -30,7 +30,7 @@ def inline(text):
     return text
 
 
-FILENAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:\.(day|night))?\.md$")
+FILENAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:\.(morning|afternoon|night|day))?\.md$")
 
 
 def parse(path):
@@ -73,8 +73,13 @@ def parse(path):
     return {"note": " ".join(note), "cats": cats}
 
 
-SESSION_LABEL = {"day": "日盘（06:00–18:00）", "night": "夜盘（18:00–次日06:00）"}
-SESSION_ORDER = {"day": 0, "night": 1}
+SESSION_LABEL = {
+    "morning": "上午盘（06:00–12:00）",
+    "afternoon": "下午盘（12:00–18:00）",
+    "night": "夜盘（18:00–次日06:00）",
+    "day": "日盘（06:00–18:00，旧格式）",
+}
+SESSION_ORDER = {"morning": 0, "afternoon": 1, "night": 2, "day": 0}
 
 
 def render_chapter(chap):

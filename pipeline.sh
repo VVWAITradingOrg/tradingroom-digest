@@ -1,10 +1,10 @@
 #!/bin/bash
-# 面包tradingroom 日报单入口。LaunchAgent 每天 06:00/18:00 (America/Los_Angeles) 调这一个脚本。
+# 面包tradingroom 日报单入口。LaunchAgent 每天 06:00/12:00/18:00 (America/Los_Angeles) 调这一个脚本。
 #
 # 用法:
-#   pipeline.sh                          # 按当前时间自动判断该跑 day 还是 night
-#   pipeline.sh --session day|night      # 手动指定
-#   pipeline.sh --session day   --window "2026-09-11 06:00" "2026-09-11 18:00"   # 手动指定窗口(补跑用)
+#   pipeline.sh                                    # 按当前时间自动判断该跑 morning/afternoon/night 哪一段
+#   pipeline.sh --session morning|afternoon|night  # 手动指定
+#   pipeline.sh --session morning --window "2026-09-11 06:00" "2026-09-11 12:00"   # 手动指定窗口(补跑用)
 #   pipeline.sh --no-deliver             # 只生成日报，不发 Discord、不发 vvwbot（backfill.sh 用）
 #
 # trap EXIT 兜底：无论哪步失败都会走到 report.sh fail。
@@ -33,25 +33,33 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# ---- 自动判断 session（没手动指定时）----
+# ---- 自动判断 session（没手动指定时，按当前小时反推刚结束的窗口）----
 NOW_HOUR="$(date +%H)"
 if [ -z "$SESSION" ]; then
-  if [ "$NOW_HOUR" -lt 12 ]; then SESSION="night"; else SESSION="day"; fi
+  if [ "$NOW_HOUR" -lt 12 ]; then SESSION="night"
+  elif [ "$NOW_HOUR" -lt 18 ]; then SESSION="morning"
+  else SESSION="afternoon"
+  fi
 fi
 
 # ---- 算窗口（没手动指定时）----
 if [ -z "$WIN_START" ]; then
-  if [ "$SESSION" = "day" ]; then
-    TARGET_DATE="$(date +%F)"
-    WIN_START="$TARGET_DATE 06:00"
-    WIN_END="$TARGET_DATE 18:00"
-    FILE_DATE="$TARGET_DATE"
-  elif [ "$SESSION" = "night" ]; then
+  if [ "$SESSION" = "night" ]; then
     TARGET_DATE="$(date +%F)"
     YDAY="$(date -v-1d +%F)"
     WIN_START="$YDAY 18:00"
     WIN_END="$TARGET_DATE 06:00"
     FILE_DATE="$YDAY"   # 夜盘追加到"昨天"的文件
+  elif [ "$SESSION" = "morning" ]; then
+    TARGET_DATE="$(date +%F)"
+    WIN_START="$TARGET_DATE 06:00"
+    WIN_END="$TARGET_DATE 12:00"
+    FILE_DATE="$TARGET_DATE"
+  elif [ "$SESSION" = "afternoon" ]; then
+    TARGET_DATE="$(date +%F)"
+    WIN_START="$TARGET_DATE 12:00"
+    WIN_END="$TARGET_DATE 18:00"
+    FILE_DATE="$TARGET_DATE"
   else
     echo "session=full 必须配 --window" >&2
     exit 1
@@ -162,9 +170,17 @@ bash report.sh "$JOB" step "5/5 交付" "$SESSION_LABEL"
 
 DIGEST_SUMMARY="$(sed -n '2,4p' "$DIGEST_FILE" | grep '^>' | head -1 | sed 's/^> //')"
 
+SESSION_CN="$SESSION"
+case "$SESSION" in
+  night) SESSION_CN="夜盘" ;;
+  morning) SESSION_CN="上午盘" ;;
+  afternoon) SESSION_CN="下午盘" ;;
+  day) SESSION_CN="日盘" ;;
+esac
+
 if [ "$DELIVER" = "1" ]; then
   openclaw message send --channel discord -t "channel:1548152579844743228" \
-    -m "📋 ${FILE_DATE} ${SESSION}盘\n${DIGEST_SUMMARY}" \
+    -m "📋 ${FILE_DATE} ${SESSION_CN}\n${DIGEST_SUMMARY}" \
     --media "$DIR/$DIGEST_FILE" >/dev/null 2>&1 \
     || echo "[pipeline] Discord 投递失败，见下方 vvwbot 步骤是否仍继续" >&2
 

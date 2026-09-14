@@ -8,7 +8,7 @@
 #   report.sh <job> fail  <message> [session] [channel]
 #
 # 心跳文件: ~/.openclaw/task-status/<job>.json          {status, session, step, message, ts}
-# 最近成功: ~/.openclaw/task-status/<job>-last-ok.json  {day: {...}, night: {...}}  (仅 ok 时更新)
+# 最近成功: ~/.openclaw/task-status/<job>-last-ok.json  {morning: {...}, afternoon: {...}, night: {...}}  (仅 ok 时更新)
 #
 # start/step 只落本地心跳文件；ok/fail 才发 Discord。
 set -uo pipefail

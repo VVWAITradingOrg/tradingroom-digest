@@ -4,7 +4,7 @@
 # 用法: backfill.sh              （跑 exports/daily 下所有还没生成 digest 的历史日期）
 #      backfill.sh --one 日期   （单天，内部用，也可以手动调）
 set -uo pipefail
-DIR="$HOME/Desktop/tradingroom-digest"
+DIR="$HOME/Automation/tradingroom-digest"
 cd "$DIR"
 mkdir -p exports/daily/digests logs
 
@@ -22,7 +22,7 @@ if [ -z "$DAYS" ]; then
   echo "exports/daily/ 下没有整天格式的历史 txt，先用 pipeline.sh --session full --window ... 抓一天再跑本脚本" >&2
   exit 1
 fi
-TODO=$(comm -23 <(echo "$DAYS") <(ls exports/daily/digests/*.md 2>/dev/null | sed 's|.*/||; s|\.md$||' | grep -vE '\.(day|night)$' | sort))
+TODO=$(comm -23 <(echo "$DAYS") <(ls exports/daily/digests/*.md 2>/dev/null | sed 's|.*/||; s|\.md$||' | grep -vE '\.(day|night|morning|afternoon)$' | sort))
 echo "待处理: $(echo "$TODO" | grep -c .) 天"
 echo "$TODO" | xargs -P 1 -I{} bash "$DIR/backfill.sh" --one {}
-echo "全部结束，生成 $(ls exports/daily/digests/*.md 2>/dev/null | grep -cvE '\.(day|night)\.md$') 份整天日报"
+echo "全部结束，生成 $(ls exports/daily/digests/*.md 2>/dev/null | grep -cvE '\.(day|night|morning|afternoon)\.md$') 份整天日报"
