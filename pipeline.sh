@@ -147,32 +147,78 @@ fi
 
 # ---- 4. 分析（唯一值钱的一步）----
 CUR_STEP="4/5 分析"
-bash report.sh "$JOB" step "4/5 Codex $MODEL 分析中" "$SESSION_LABEL"
 mkdir -p "$(dirname "$DIGEST_FILE")" logs
-CODEX_STDOUT="logs/codex_${FILE_DATE}_${SESSION}.stdout.log"
-CODEX_STDERR="logs/codex_${FILE_DATE}_${SESSION}.stderr.log"
+# 单文件、按尝试追加写入（不是每次覆盖），每次尝试前打一行清楚的分隔标记，
+# 这样失败时打开这一个文件就能看到完整的重试过程，不用去猜是哪一次、哪个模型、卡在哪。
+CODEX_LOG="logs/codex_${FILE_DATE}_${SESSION}.log"
+: > "$CODEX_LOG"
 DIGEST_TMP="${DIGEST_FILE}.tmp.$$"
-rm -f "$DIGEST_TMP"
 
 # 这个项目的 LLM 用量记在 ljianhui100@gmail.com 账号下（codex-profile 的 "w" 分身），
 # 不用默认的 ~/.codex（vivianxuanz@gmail.com）。
 export CODEX_HOME="$HOME/.codex-w"
 
-if ! printf '%s\n' "$PROMPT" | codex --ask-for-approval never exec \
-  --model "$MODEL" \
-  --sandbox read-only \
-  --cd "$DIR" \
-  --ephemeral \
-  --output-last-message "$DIGEST_TMP" \
-  - >"$CODEX_STDOUT" 2>"$CODEX_STDERR"; then
+# "at capacity"/限流是 OpenAI 那边偶发的临时过载，不是代码问题，不该直接判失败中止一整条流水线。
+# 策略：主模型失败且看起来是临时过载 -> 立刻换备用模型（不同模型池，不用等）-> 还是临时过载 -> 等一会再用主模型重试一次。
+# 任何一次遇到非临时性错误（比如 prompt 有问题、账号鉴权失败）都直接判失败，不浪费时间重试。
+FALLBACK_MODEL="${TRADINGROOM_FALLBACK_MODEL:-gpt-5.6-sol}"
+
+is_transient_capacity_error() {
+  grep -qiE "at capacity|rate limit|overloaded|try again|temporarily unavailable|too many requests|50[234]" "$1"
+}
+
+# 每次尝试失败后的一句话摘要（供最终失败消息用），取 ERROR 行，没有就取最后一行非空内容。
+summarize_failure() {
+  local since_line="$1"
+  local chunk
+  chunk="$(tail -n "+$since_line" "$CODEX_LOG")"
+  echo "$chunk" | grep -im1 "error" || echo "$chunk" | grep -v '^\s*$' | tail -1
+}
+
+ANALYSIS_OK=0
+ATTEMPT_SUMMARY=""
+attempt_n=0
+for plan in "$MODEL:0" "$FALLBACK_MODEL:0" "$MODEL:60"; do
+  attempt_n=$((attempt_n + 1))
+  TRY_MODEL="${plan%%:*}"
+  WAIT_BEFORE="${plan##*:}"
+  [ "$WAIT_BEFORE" -gt 0 ] && sleep "$WAIT_BEFORE"
+
+  START_LINE=$(($(wc -l < "$CODEX_LOG") + 1))
+  {
+    echo "===== 尝试 $attempt_n/3：model=${TRY_MODEL}，等待${WAIT_BEFORE}s，$(date -u +%Y-%m-%dT%H:%M:%SZ) ====="
+  } >> "$CODEX_LOG"
+  bash report.sh "$JOB" step "4/5 Codex 尝试 $attempt_n/3（${TRY_MODEL}）分析中" "$SESSION_LABEL"
+
   rm -f "$DIGEST_TMP"
-  bash report.sh "$JOB" fail "Codex $MODEL 分析失败，本次不计入已完成；见 $CODEX_STDERR" "$SESSION_LABEL" "$NOTIFY_CHANNEL"
-  trap - EXIT
-  exit 1
-fi
-if [ ! -s "$DIGEST_TMP" ]; then
+  printf '%s\n' "$PROMPT" | codex --ask-for-approval never exec \
+    --model "$TRY_MODEL" \
+    --sandbox read-only \
+    --cd "$DIR" \
+    --ephemeral \
+    --output-last-message "$DIGEST_TMP" \
+    - >> "$CODEX_LOG" 2>&1
+  CODEX_EXIT=$?
+
+  if [ "$CODEX_EXIT" -eq 0 ] && [ -s "$DIGEST_TMP" ]; then
+    ANALYSIS_OK=1
+    break
+  fi
+
+  REASON="$(summarize_failure "$START_LINE")"
+  if [ "$CODEX_EXIT" -eq 0 ]; then
+    REASON="exit=0 但没有产出内容${REASON:+；$REASON}"
+  fi
+  ATTEMPT_SUMMARY="${ATTEMPT_SUMMARY}尝试${attempt_n}(${TRY_MODEL})：${REASON:-无输出/exit=$CODEX_EXIT}；"
+
+  if ! is_transient_capacity_error "$CODEX_LOG"; then
+    break  # 不是临时过载，重试没意义，直接跳出去报失败
+  fi
+done
+
+if [ "$ANALYSIS_OK" -ne 1 ]; then
   rm -f "$DIGEST_TMP"
-  bash report.sh "$JOB" fail "Codex $MODEL 未产出日报；见 $CODEX_STDERR" "$SESSION_LABEL" "$NOTIFY_CHANNEL"
+  bash report.sh "$JOB" fail "Codex 分析失败：${ATTEMPT_SUMMARY}完整过程见 $CODEX_LOG" "$SESSION_LABEL" "$NOTIFY_CHANNEL"
   trap - EXIT
   exit 1
 fi
