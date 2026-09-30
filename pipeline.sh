@@ -87,6 +87,38 @@ trap 'ec=$?; if [ $ec -ne 0 ]; then bash report.sh "$JOB" fail "第 ${CUR_STEP:-
 bash report.sh "$JOB" start "$SESSION_LABEL"
 echo "[pipeline] session=$SESSION 窗口=[$WIN_START, $WIN_END) -> $DIGEST_FILE"
 
+# 06:00 夜盘窗口追加开盘交易机会；独立输出，复用 v2 原文/缓存/投递回执。
+# 原日报命中 seen 时也执行，以便单独补回失败/尚未生成的机会报告。
+run_opening_report() {
+  [ "$SESSION" = "night" ] || return 0
+  [ "${TRADINGROOM_OPENING_ENABLED:-1}" != "0" ] || return 0
+  bash report.sh "$JOB" step "6/6 早盘开盘交易机会" "$SESSION_LABEL"
+  mkdir -p logs
+  if ! /bin/bash /Users/vvw/Automation/tradingroom-digest-v2/opening-addon.sh \
+      "$SESSION" "$WIN_START" "$WIN_END" "$DELIVER" \
+      >> "logs/opening_${FILE_DATE}.log" 2>&1; then
+    bash report.sh "$JOB" fail "开盘机会报告失败；原日报保留，重试可只补机会报告。见 logs/opening_${FILE_DATE}.log" "$SESSION_LABEL" "$NOTIFY_CHANNEL"
+    return 1
+  fi
+}
+
+# Prepared for the existing Manager-supervised night job; local preview first.
+# First activation is explicit: TRADINGROOM_POSITIONS_ENABLED=1.
+run_night_reports() {
+  local failed=0
+  run_opening_report || failed=1
+  if [ "$SESSION" = "night" ] && [ "${TRADINGROOM_POSITIONS_ENABLED:-0}" = "1" ]; then
+    mkdir -p logs
+    if ! /bin/bash /Users/vvw/Automation/tradingroom-digest-v2/positions-addon.sh \
+        "$SESSION" "$WIN_START" "$WIN_END" "$DELIVER" \
+        >> "logs/positions_${FILE_DATE}.log" 2>&1; then
+      bash report.sh "$JOB" fail "持仓报告失败；见 logs/positions_${FILE_DATE}.log" "$SESSION_LABEL" "$NOTIFY_CHANNEL"
+      failed=1
+    fi
+  fi
+  return "$failed"
+}
+
 # ---- 1. 抓取 ----
 CUR_STEP="1/5 抓取"
 bash report.sh "$JOB" step "1/5 抓取 [$WIN_START, $WIN_END)" "$SESSION_LABEL"
@@ -123,6 +155,10 @@ EOF
 )"
 
 if [ "$PREV_COUNT" = "$MSG_COUNT" ] && [ -f "$DIGEST_FILE" ]; then
+  if ! run_night_reports; then
+    trap - EXIT
+    exit 1
+  fi
   bash report.sh "$JOB" ok "无新增，跳过 ($FILE_DATE/$SESSION, $MSG_COUNT 条)" "$SESSION_LABEL" "$NOTIFY_CHANNEL"
   trap - EXIT
   exit 0
@@ -262,16 +298,17 @@ case "$SESSION" in
   day) SESSION_CN="日盘" ;;
 esac
 
+DELIVERY_FAILED=0
 if [ "$DELIVER" = "1" ]; then
   openclaw message send --channel discord -t "channel:1548152579844743228" \
     -m "📋 ${FILE_DATE} ${SESSION_CN} · 精简版\n${BRIEF_SUMMARY:-$FULL_SUMMARY}" \
     --media "$DIR/$DIGEST_BRIEF_FILE" >/dev/null 2>&1 \
-    || echo "[pipeline] Discord 精简版投递失败，见下方 vvwbot 步骤是否仍继续" >&2
+    || { echo "[pipeline] Discord 精简版投递失败" >&2; DELIVERY_FAILED=1; }
 
   openclaw message send --channel discord -t "channel:1548152579844743228" \
     -m "📋 ${FILE_DATE} ${SESSION_CN} · 详细版\n${FULL_SUMMARY}" \
     --media "$DIR/$DIGEST_FILE" >/dev/null 2>&1 \
-    || echo "[pipeline] Discord 详细版投递失败，见下方 vvwbot 步骤是否仍继续" >&2
+    || { echo "[pipeline] Discord 详细版投递失败" >&2; DELIVERY_FAILED=1; }
 
   bash report.sh "$JOB" step "5/5 交付 vvwbot" "$SESSION_LABEL"
   VVWBOT_DIR="/Users/vvw/Automation/vvwbot-site"
@@ -279,20 +316,20 @@ if [ "$DELIVER" = "1" ]; then
   VVWBOT_STATUS=$?
   if [ "$VVWBOT_STATUS" -ne 0 ]; then
     bash report.sh "$JOB" fail "vvwbot 构建/部署命令本身失败 (exit=$VVWBOT_STATUS)，不看 Access 校验直接判失败。输出: $(echo "$VVWBOT_OUT" | tail -c 400)" "$SESSION_LABEL"
-    trap - EXIT
-    exit 1
-  fi
-  # Access 校验只是双保险（防 Access 保护本身失效导致误报安全），不能替代上面的退出码检查——
-  # curl 对一个"受保护但根本没部署成功"的路径同样会拿到 302，靠它单独判断会漏掉真实的部署失败。
-  ACCESS_CHECK="$(curl -sS -o /dev/null -w '%{http_code}' https://vvwbot.com/research/tradingroom/ 2>/dev/null || echo "000")"
-  if [ "$ACCESS_CHECK" != "302" ]; then
-    bash report.sh "$JOB" fail "vvwbot 命令退出码是0，但 Access 校验失败：/research/tradingroom/ 返回 ${ACCESS_CHECK}（应为302），可能是 Access 保护本身失效，不能当成功处理" "$SESSION_LABEL"
-    trap - EXIT
-    exit 1
+    DELIVERY_FAILED=1
+  else
+    # Access 校验只是双保险（防 Access 保护本身失效导致误报安全），不能替代上面的退出码检查——
+    # curl 对一个"受保护但根本没部署成功"的路径同样会拿到 302，靠它单独判断会漏掉真实的部署失败。
+    ACCESS_CHECK="$(curl -sS -o /dev/null -w '%{http_code}' https://vvwbot.com/research/tradingroom/ 2>/dev/null || echo "000")"
+    if [ "$ACCESS_CHECK" != "302" ]; then
+      bash report.sh "$JOB" fail "vvwbot 命令退出码是0，但 Access 校验失败：/research/tradingroom/ 返回 ${ACCESS_CHECK}（应为302），可能是 Access 保护本身失效，不能当成功处理" "$SESSION_LABEL"
+      DELIVERY_FAILED=1
+    fi
   fi
 fi
 
 # ---- 全部成功：落 seen 记录 ----
+if [ "$DELIVER" = "1" ] && [ "$DELIVERY_FAILED" = "0" ]; then
 "$PY" - "$SEEN_FILE" "$FILE_DATE" "$SESSION" "$MSG_COUNT" <<'EOF'
 import json, sys
 from datetime import datetime, timezone
@@ -302,7 +339,16 @@ rec = {"date": date, "session": session, "message_count": count,
 with open(path, "a", encoding="utf-8") as f:
     f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 EOF
+fi
 
+# 旧版 seen 已落盘；新增项失败后重试走上面的 seen 分支，避免重复交付旧日报。
+ADDON_FAILED=0
+run_night_reports || ADDON_FAILED=1
+if [ "$DELIVERY_FAILED" != "0" ] || [ "$ADDON_FAILED" != "0" ]; then
+  bash report.sh "$JOB" fail "交付失败=${DELIVERY_FAILED}；夜盘附加报告失败=${ADDON_FAILED}（独立执行，详见日志）" "$SESSION_LABEL" "$NOTIFY_CHANNEL"
+  trap - EXIT
+  exit 1
+fi
 bash report.sh "$JOB" ok "$FILE_DATE ${SESSION}盘 完成 ($MSG_COUNT 条)" "$SESSION_LABEL" "$NOTIFY_CHANNEL"
 trap - EXIT
 exit 0

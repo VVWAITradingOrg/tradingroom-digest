@@ -22,3 +22,9 @@ Mac mini 上的面包群聊汇总项目。LaunchAgent 每天 06:00/18:00 PT 导�
 - 项目内 `watchdog.py` 是旧的专用巡检器；统一管理后由 `/Users/vvw/Automation/manager/supervisor.py` 负责全局状态监控。
 - 日志：`logs/launchagent.*.log`。
 - 管理：`/Users/vvw/Automation/manager/automationctl status`。
+
+## Night report failure isolation
+
+2026-09-30 修复：网站构建/部署或 Access 检查失败后，仍执行 night 附加报告；整体保留非零退出状态。
+Discord 失败同样不再被当成整体成功；本地 `--no-deliver` 不写入已投递 seen 记录。
+持仓附加脚本也已预留在同一流程中，但 `TRADINGROOM_POSITIONS_ENABLED` 默认0，尚未首发或启用。
