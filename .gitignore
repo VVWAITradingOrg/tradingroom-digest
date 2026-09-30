@@ -10,3 +10,8 @@ createdump
 DiscordChatExporter.Cli
 DiscordChatExporter.Cli.deps.json
 DiscordChatExporter.Cli.runtimeconfig.json
+
+data/
+reports/
+__pycache__/
+*.backup-*
