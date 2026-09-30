@@ -233,8 +233,8 @@ for plan in "$MODEL:0" "$FALLBACK_MODEL:0" "$MODEL:60"; do
   bash report.sh "$JOB" step "4/5 Codex 尝试 $attempt_n/3（${TRY_MODEL}）分析中" "$SESSION_LABEL"
 
   rm -f "$DIGEST_TMP"
-  printf '%s\n' "$PROMPT" | codex --ask-for-approval never exec \
-    --ignore-user-config --model "$TRY_MODEL" \
+  printf '%s\n' "$PROMPT" | "$PY" "$DIR/codex_timed.py" codex --ask-for-approval never exec \
+    --ignore-user-config -c 'model_reasoning_effort="medium"' --model "$TRY_MODEL" \
     --sandbox read-only \
     --cd "$DIR" \
     --ephemeral \
