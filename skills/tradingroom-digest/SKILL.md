@@ -9,7 +9,7 @@ description: Analyze an exported Discord trading-room window into a Chinese, tic
 
 ## 输入与边界
 
-调用方会明确指定输入文件、模式、时间窗口和目标文件，不要自己猜路径。先读 `docs/chat-glossary.md` 和指定的全量或章节文件，必要时再读同前缀的单人发言文件辅助定位；观点必须回到全量上下文确认。人物登记表是项目根目录的 `people.json`。
+调用方会明确指定输入文件、模式、时间窗口和目标文件，不要自己猜路径。先读 `docs/chat-glossary.md` 和指定的全量或章节文件，统一模式仅以本次指定JSONL及其回复上下文为原文证据，不使用旧单人发言文件补入本期事实；观点必须回到全量上下文确认。人物登记表是项目根目录的 `people.json`。
 
 暗语词典只用于理解和消歧，不能替代当前窗口的原始上下文。词典中标为「待确认」或低置信度的词不得擅自补全；遇到新含义或与词典冲突的用法，以当前原文为准并在「未能明确归属」中说明。
 
@@ -32,7 +32,7 @@ description: Analyze an exported Discord trading-room window into a Chinese, tic
 | 面包 | `himself65`，ID `561550080188874762` | 本人发言 |
 | solo | `solo_leveling116`，ID `1355949217893585258` | 本人发言 |
 | 咕噜哥 | `sunrunlong1727`，ID `399423460469768192` | 本人发言，按 ID 识别 |
-| Frank（孔子） | `frank_hou._87743`，ID `1145819748035199166` | 本人发言很少，主要来自明确转述 |
+| Frank（孔子） | `frank_hou._87743`，ID `1145819748035199166` | 本人发言按 ID 识别；明确转述另行标注 |
 | 黄哥 | 群里没有对应账号 | 只采用明确转述 |
 
 只保留这五人的实质观点。其他人的话只可在解释必要语境时一句带过。认 ID 不认昵称；例如 `cryptoming` 不是 Frank。

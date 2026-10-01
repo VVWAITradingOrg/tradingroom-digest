@@ -289,28 +289,11 @@ bash report.sh "$JOB" step "5/5 交付" "$SESSION_LABEL"
 
 "$PY" build_view.py >/dev/null 2>&1 || echo "[pipeline] 本地看板生成失败，不影响主流程" >&2
 
-BRIEF_SUMMARY="$(sed -n '2,4p' "$DIGEST_BRIEF_FILE" 2>/dev/null | grep '^>' | head -1 | sed 's/^> //')"
-FULL_SUMMARY="$(sed -n '2,4p' "$DIGEST_FILE" | grep '^>' | head -1 | sed 's/^> //')"
-
-SESSION_CN="$SESSION"
-case "$SESSION" in
-  night) SESSION_CN="夜盘" ;;
-  morning) SESSION_CN="上午盘" ;;
-  afternoon) SESSION_CN="下午盘" ;;
-  day) SESSION_CN="日盘" ;;
-esac
-
 DELIVERY_FAILED=0
 if [ "$DELIVER" = "1" ]; then
-  openclaw message send --channel discord -t "channel:1548152579844743228" \
-    -m "📋 Frank面包 · ${FILE_DATE} ${SESSION_CN} · 精简版\n${BRIEF_SUMMARY:-$FULL_SUMMARY}" \
-    --media "$DIR/$DIGEST_BRIEF_FILE" >/dev/null 2>&1 \
-    || { echo "[pipeline] Discord 精简版投递失败" >&2; DELIVERY_FAILED=1; }
-
-  openclaw message send --channel discord -t "channel:1548152579844743228" \
-    -m "📋 Frank面包 · ${FILE_DATE} ${SESSION_CN} · 详细版\n${FULL_SUMMARY}" \
-    --media "$DIR/$DIGEST_FILE" >/dev/null 2>&1 \
-    || { echo "[pipeline] Discord 详细版投递失败" >&2; DELIVERY_FAILED=1; }
+  "$PY" /Users/vvw/Automation/tradingroom-digest-v2/deliver_pair.py \
+    --brief "$DIR/$DIGEST_BRIEF_FILE" --full "$DIR/$DIGEST_FILE" >/dev/null 2>&1 \
+    || { echo "[pipeline] 统一日报投递未确认；检查各篇SQLite回执后重试" >&2; DELIVERY_FAILED=1; }
 
   bash report.sh "$JOB" step "5/5 交付 vvwbot" "$SESSION_LABEL"
   VVWBOT_DIR="/Users/vvw/Automation/vvwbot-site"
