@@ -3,7 +3,7 @@ name: tradingroom-digest
 description: Analyze an exported Discord trading-room window into a Chinese, ticker-organized digest containing only the five tracked people's substantive views. Use when pipeline.sh requests a full-day or session digest from files under exports/daily.
 ---
 
-# 面包 tradingroom 日报
+# Frank面包统一日报
 
 把指定群聊记录整理成按标的分类的中文结论清单。读者是主动交易者，需要人物的判断、操作和理由，不是聊天实况。
 
@@ -88,3 +88,8 @@ description: Analyze an exported Discord trading-room window into a Chinese, tic
 输入JSONL的author_id是唯一身份依据。每条关注人物发言先沿reply_to寻找父消息和祖先，写清回答谁、哪个问题、同意/否定/条件限制；不可把提问者的计划变成回复者已执行交易。短句必须结合同频道的明确回复链，邻近聊天仅为次级证据。context_only是窗口外语境，不能成为本时段新观点；父消息缺失时保留不确定。关键结论附本人消息url及必要父消息url。
 仓位证据参考附有来源、逐字证据和时间，只代表历史文字状态；计划、截图或看多不能自动成为持仓。不把历史动作当本窗口新交易。
 vision.status=ok表示程序已经读取图片，observations是视觉结果，需区分图片中可见信息和发图人的文字陈述；交易截图不自动证明本人真实持仓。图片无法读取或有不确定处要写明，不能补数字。
+
+## 多来源统一分析
+
+本流程同时提供面包频道、Frank tradingroom、Frank frank频道的记录。按同一人物×同一标的合并观点，不按来源各写一份报告；只输出一个精简版和一个详细版。相同内容去重但保留不同时间、不同条件、矛盾和变化；共识仍按不同人物计算，同一个人在不同频道发言不算多个人。
+每条关键观点注明来源频道和时间，保留原文链接。跨来源的相同标的可以比较观点、仓位历史和时间线；问答关系只能由明确reply_to或同频道邻近问答建立，绝不能因不同频道时间接近就拼成回复。完整回复祖先与必要的其他人问题是分析证据，不能只阅读关注者的孤立短句。
