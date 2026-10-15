@@ -21,6 +21,7 @@ Mac mini 上的面包群聊汇总项目。LaunchAgent 每天 06:00/11:00/17:00 P
 
 ## Analysis contract
 
+- Discord 使用每份附件的 `DISCORD_SUMMARY`：先人物、标的和多空方向，再写分歧/变化；MD开篇仍为正文导读。生产要求专用摘要，缺失或超长时停止投递。`--no-deliver` 同样校验并写出 `logs/discord_preview_<date>_<session>.json`；两版附件和防重回执保持独立。
 - 分析规则位于 `skills/tradingroom-digest/SKILL.md`，由 `pipeline.sh` 显式要求 Codex 读取。
 - 群内人物代称、ticker 黑话和交易暗语位于 `docs/chat-glossary.md`；日报模型先读词典，再以当前窗口原文做最终消歧。
 - Codex 在 `read-only` sandbox 中运行；CLI 把最终回复先写入临时文件，成功后再原子替换目标 digest。

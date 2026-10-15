@@ -151,7 +151,7 @@ for line in open(path, encoding="utf-8"):
         r = json.loads(line)
     except Exception:
         continue
-    if r.get("date") == date and r.get("session") == session and r.get("window") == [start,end] and r.get("model") == model and r.get("rules") == "combined-context-v1" and r.get("fingerprint") == fingerprint:
+    if r.get("date") == date and r.get("session") == session and r.get("window") == [start,end] and r.get("model") == model and r.get("rules") == "combined-direction-v2" and r.get("fingerprint") == fingerprint:
         last = r
 print(last["message_count"] if last else -1)
 EOF
@@ -283,6 +283,11 @@ if [ $? -ne 0 ]; then
 fi
 rm -f "$DIGEST_TMP"
 
+# Validate both user-visible summaries even during a no-delivery preview.
+"$PY" /Users/vvw/Automation/tradingroom-digest-v2/deliver_pair.py \
+  --brief "$DIR/$DIGEST_BRIEF_FILE" --full "$DIR/$DIGEST_FILE" \
+  --require-directional --preview > "logs/discord_preview_${FILE_DATE}_${SESSION}.json" || exit 1
+
 # ---- 5. 交付 ----
 CUR_STEP="5/5 交付"
 bash report.sh "$JOB" step "5/5 交付" "$SESSION_LABEL"
@@ -292,7 +297,7 @@ bash report.sh "$JOB" step "5/5 交付" "$SESSION_LABEL"
 DELIVERY_FAILED=0
 if [ "$DELIVER" = "1" ]; then
   "$PY" /Users/vvw/Automation/tradingroom-digest-v2/deliver_pair.py \
-    --brief "$DIR/$DIGEST_BRIEF_FILE" --full "$DIR/$DIGEST_FILE" >/dev/null 2>&1 \
+    --brief "$DIR/$DIGEST_BRIEF_FILE" --full "$DIR/$DIGEST_FILE" --require-directional >/dev/null 2>&1 \
     || { echo "[pipeline] 统一日报投递未确认；检查各篇SQLite回执后重试" >&2; DELIVERY_FAILED=1; }
 
   bash report.sh "$JOB" step "5/5 交付 vvwbot" "$SESSION_LABEL"
@@ -319,7 +324,7 @@ if [ "$DELIVER" = "1" ] && [ "$DELIVERY_FAILED" = "0" ]; then
 import json, sys
 from datetime import datetime, timezone
 path, date, session, count = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
-rec = {"window":sys.argv[5:7], "model":sys.argv[7], "rules":"combined-context-v1", "sources":"all", "fingerprint":sys.argv[8], "date": date, "session": session, "message_count": count,
+rec = {"window":sys.argv[5:7], "model":sys.argv[7], "rules":"combined-direction-v2", "sources":"all", "fingerprint":sys.argv[8], "date": date, "session": session, "message_count": count,
        "completed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
 with open(path, "a", encoding="utf-8") as f:
     f.write(json.dumps(rec, ensure_ascii=False) + "\n")
