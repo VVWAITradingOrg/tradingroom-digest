@@ -41,6 +41,10 @@ Mac mini 上的面包群聊汇总项目。LaunchAgent 每天 06:00/11:00/17:00 P
 Discord 失败同样不再被当成整体成功；本地 `--no-deliver` 不写入已投递 seen 记录。
 持仓附加脚本也已预留在同一流程中，但 `TRADINGROOM_POSITIONS_ENABLED` 默认0，尚未首发或启用。
 
+2026-10-15：独立的关注人 position 日跟踪已启用。原06:00 night流程在开盘机会之后调用 v2 `position-tracking-addon.sh`，按美西自然日00:00–次日00:00整理前一个完整日，投递到「关注人position跟踪」。每人summary及同标的前日披露对照，附原文链接；图片未做视觉解析，不推算净仓位或胜率。
+`TRADINGROOM_POSITION_TRACKING_ENABLED=0` 可关闭该项；`--no-deliver` 会传0，强制离线且不发送。原旧快照开关继续默认0。
+历史9/1–10/14共44份已投递并读回核对，日期回执避免重复。追加步骤会更新父任务进度；失败返回非零，日志为 `logs/position_tracking_<夜盘起始日>.log`。没有新增定时任务，Manager将night完成告警阈值调整为07:15，06:00启动时间不变。
+
 - LaunchAgent：`com.vvw.tradingroom-digest`，06:00/11:00/17:00 PT；`RunAtLoad` 通过 `startup-check.sh` 只补跑最近已到期的 session。
 - heartbeat：`~/.openclaw/task-status/tradingroom-digest.json`。
 - 项目内 `watchdog.py` 是旧的专用巡检器；统一管理后由 `/Users/vvw/Automation/manager/supervisor.py` 负责全局状态监控。

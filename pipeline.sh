@@ -103,8 +103,8 @@ run_opening_report() {
   fi
 }
 
-# Prepared for the existing Manager-supervised night job; local preview first.
-# First activation is explicit: TRADINGROOM_POSITIONS_ENABLED=1.
+# Night addons share the existing Manager-supervised job. The legacy positions
+# snapshot remains opt-in; daily tracking is enabled after verified backfill.
 run_night_reports() {
   local failed=0
   run_opening_report || failed=1
@@ -117,7 +117,8 @@ run_night_reports() {
       failed=1
     fi
   fi
-  if [ "$SESSION" = "night" ] && [ "${TRADINGROOM_POSITION_TRACKING_ENABLED:-0}" = "1" ]; then
+  if [ "$SESSION" = "night" ] && [ "${TRADINGROOM_POSITION_TRACKING_ENABLED:-1}" = "1" ]; then
+    bash report.sh "$JOB" step "关注人position日跟踪" "$SESSION_LABEL"
     mkdir -p logs
     if ! /bin/bash /Users/vvw/Automation/tradingroom-digest-v2/position-tracking-addon.sh \
         "$SESSION" "$WIN_END" "$DELIVER" >> "logs/position_tracking_${FILE_DATE}.log" 2>&1; then
@@ -167,6 +168,7 @@ EOF
 
 if [ "$PREV_COUNT" = "$MSG_COUNT" ] && [ -f "$DIGEST_FILE" ]; then
   if ! run_night_reports; then
+    bash report.sh "$JOB" fail "夜盘附加报告补跑失败；原日报已交付，详见各附加项日志" "$SESSION_LABEL" "$NOTIFY_CHANNEL"
     trap - EXIT
     exit 1
   fi
