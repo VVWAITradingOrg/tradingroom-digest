@@ -117,6 +117,14 @@ run_night_reports() {
       failed=1
     fi
   fi
+  if [ "$SESSION" = "night" ] && [ "${TRADINGROOM_POSITION_TRACKING_ENABLED:-0}" = "1" ]; then
+    mkdir -p logs
+    if ! /bin/bash /Users/vvw/Automation/tradingroom-digest-v2/position-tracking-addon.sh \
+        "$SESSION" "$WIN_END" "$DELIVER" >> "logs/position_tracking_${FILE_DATE}.log" 2>&1; then
+      bash report.sh "$JOB" fail "关注人position日跟踪失败；见 logs/position_tracking_${FILE_DATE}.log" "$SESSION_LABEL" "$NOTIFY_CHANNEL"
+      failed=1
+    fi
+  fi
   return "$failed"
 }
 
